@@ -344,3 +344,5 @@ app.get('/history', requireAuth, async (req, res) => {
 app.listen(3000, () => {
   console.log("Listening on port 3000");
 });
+// At the end of index.js
+module.exports = app;
