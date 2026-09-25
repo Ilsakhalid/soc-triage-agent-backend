@@ -1,3 +1,4 @@
+const { callGeminiWithRetry } = require('./geminiRetry');
 require('dotenv').config();
 
 const {Pool} = require('pg');
@@ -41,8 +42,7 @@ async function analyzeDomain(domain) {
     Respond ONLY in JSON with this exact structure:
     {"risk_level": "low/medium/high/critical", "explanation": "1-2 sentence plain-English reasoning", "recommended_action": "ignore/monitor/escalate/block"}`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const text = await callGeminiWithRetry(model, prompt);
     const verdict = JSON.parse(text.replace(/```json|```/g, '').trim());
 
     return {summary, verdict};
@@ -145,8 +145,7 @@ async function analyzeUrl(targetUrl) {
     Respond ONLY in JSON with this exact structure:
     {"risk_level": "low/medium/high/critical", "explanation": "1-2 sentence plain-English reasoning", "recommended_action": "ignore/monitor/escalate/block"}`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const text = await callGeminiWithRetry(model, prompt);
     const verdict = JSON.parse(text.replace(/```json|```/g, '').trim());
 
     return {summary, verdict};
@@ -173,8 +172,7 @@ async function analyzeHash(hash) {
     Respond ONLY in JSON with this exact structure:
     {"risk_level": "low/medium/high/critical", "explanation": "1-2 sentence plain-English reasoning", "recommended_action": "ignore/monitor/escalate/block"}`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const text = await callGeminiWithRetry(model, prompt);
     const verdict = JSON.parse(text.replace(/```json|```/g, '').trim());
   
     return{summary, verdict};
@@ -203,8 +201,7 @@ app.get('/check-ip/:ip', requireAuth, async (req, res) => {
     Respond ONLY in JSON with this exact structure:
     {"risk_level": "low/medium/high/critical", "explanation": "1-2 sentence plain-English reasoning", "recommended_action": "ignore/monitor/escalate/block"}`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const text = await callGeminiWithRetry(model, prompt);
     const verdict = JSON.parse(text.replace(/```json|```/g, '').trim());
 
     await pool.query(
@@ -219,6 +216,9 @@ app.get('/check-ip/:ip', requireAuth, async (req, res) => {
     if(error.response?.status === 429){
       return res.status(429).json({error: "Rate limit reached. Please wait a moment and try again later."});
     }
+     if (error.isGeminiUnavailable) {
+    return res.status(503).json({ error: error.message });
+  }
     if (error.response?.status === 404) {
   return res.status(404).json({ error: 'No VirusTotal record found for this indicator.', notFound: true });
 }
@@ -240,6 +240,9 @@ app.get('/check-url', requireAuth, async(req, res)=> {
     if(error.response?.status === 429){
       return res.status(429).json({error: "Rate limit reached. Please wait a moment and try again later."});
     }
+    if (error.isGeminiUnavailable) {
+    return res.status(503).json({ error: error.message });
+  }
     if (error.response?.status === 404) {
   return res.status(404).json({ error: 'No VirusTotal record found for this indicator.', notFound: true });
 }
@@ -261,6 +264,9 @@ app.get('/check-domain/:domain', requireAuth, async (req, res) => {
     if(error.response?.status === 429){
       return res.status(429).json({error: "Rate limit reached. Please wait a moment and try again later."});
     }
+    if (error.isGeminiUnavailable) {
+    return res.status(503).json({ error: error.message });
+  }
     if (error.response?.status === 404) {
   return res.status(404).json({ error: 'No VirusTotal record found for this indicator.', notFound: true });
 }
@@ -285,6 +291,9 @@ app.get('/check-hash/:hash', requireAuth, async (req, res) => {
     if (error.response?.status === 404) {
   return res.status(404).json({ error: 'No VirusTotal record found for this indicator.', notFound: true });
 }
+  if (error.isGeminiUnavailable) {
+    return res.status(503).json({ error: error.message });
+  }
     res.status(500).json({ error: 'Failed to check hash.' });
   }
 });
@@ -325,6 +334,9 @@ app.post('/check-email', requireAuth, async (req, res) => {
     if(error.response?.status === 429){
       return res.status(429).json({error: "Rate limit reached. Please wait a moment and try again later."});
     }
+    if (error.isGeminiUnavailable) {
+    return res.status(503).json({ error: error.message });
+  }
     res.status(500).json({ error: 'Failed to check email' });
   }
 });
