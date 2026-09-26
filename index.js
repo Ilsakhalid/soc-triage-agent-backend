@@ -218,7 +218,7 @@ app.get('/check-ip/:ip', requireAuth, async (req, res) => {
     }
      if (error.isGeminiUnavailable) {
     return res.status(503).json({ error: error.message });
-  }
+    }
     if (error.response?.status === 404) {
   return res.status(404).json({ error: 'No VirusTotal record found for this indicator.', notFound: true });
 }
